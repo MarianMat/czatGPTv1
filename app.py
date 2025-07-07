@@ -76,8 +76,8 @@ def get_reply(prompt, memory, model, personality):
     }
 
 # 🚀 Inicjalizacja
-st.set_page_config(page_title="MarianGPT", layout="centered")
-st.title("🧠 MarianGPT – Inteligentny czat z pamięcią")
+st.set_page_config(page_title="MójGPT", layout="centered")
+st.title("🧠 MójGPT – Inteligentny czat z pamięcią")
 
 if "id" not in st.session_state:
     load_or_create_conversation()
