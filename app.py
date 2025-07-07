@@ -1,4 +1,11 @@
 import streamlit as st
+
+# pozwala Chrome odczytać manifest.json
+st.markdown(
+    '<link rel="manifest" href="static/manifest.json">',
+    unsafe_allow_html=True
+)
+
 import openai
 import json
 from pathlib import Path
