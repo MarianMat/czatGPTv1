@@ -6,7 +6,8 @@ from datetime import datetime
 from qdrant_utils import init_qdrant, save_to_qdrant, get_sessions, get_session_history, delete_session
 
 # 🔐 Klucze API z zaawansowanych ustawień Streamlit
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
+
 
 # 🌍 Inicjalizacja Qdrant
 qdrant_client = init_qdrant()
