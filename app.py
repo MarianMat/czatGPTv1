@@ -1,8 +1,10 @@
 import streamlit as st
-import openai, json
+import openai
+import json
 from pathlib import Path
 from qdrant_utils import init_qdrant, save_to_qdrant
 
+# 🔐 Klucze z Secrets
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 qdrant_client = init_qdrant()
 
@@ -15,6 +17,7 @@ model_pricings = {
 }
 USD_TO_PLN = 3.97
 
+# 🌐 Język interfejsu
 translations = {
     "Polski": {
         "title": "🧠 MójGPT – Inteligentny czat z pamięcią",
@@ -29,14 +32,14 @@ translations = {
         "cost_usd": "💰 Koszt (USD)",
         "cost_pln": "💰 Koszt (PLN)",
         "default_personality": "Jesteś pomocnym, uprzejmym i zwięzłym asystentem AI.",
-        "convo_list": "📂 Wybierz rozmowę:"
+        "conversation_list": "📂 Wybierz rozmowę"
     },
     "Українська": {
         "title": "🧠 MійGPT – Інтелектуальний чат з памʼяттю",
         "chat_title": "💬 Бесіда",
         "input_placeholder": "Задай запитання",
         "language_switch": "🌍 Мова інтерфейсу",
-        "model_select": "🤖 Вибери модель GPT",
+        "model_select": "🤖 Виберіть модель GPT",
         "personality": "🎭 Стиль GPT",
         "memory_mode": "🧠 Режим памʼяті",
         "export_button": "📤 Експортувати бесіду",
@@ -44,11 +47,11 @@ translations = {
         "cost_usd": "💰 Вартість (USD)",
         "cost_pln": "💰 Вартість (PLN)",
         "default_personality": "Ви корисний, ввічливий та лаконічний AI-помічник.",
-        "convo_list": "📂 Виберіть бесіду:"
+        "conversation_list": "📂 Виберіть бесіду"
     }
 }
 
-# 📁 Lokalna baza
+# 📁 Pliki lokalne
 DB_PATH = Path("db")
 DB_CONV_PATH = DB_PATH / "conversations"
 DB_PATH.mkdir(exist_ok=True)
@@ -64,24 +67,19 @@ def detect_topic(prompt):
     )
     return response.choices[0].message.content.strip()
 
-def load_conversation(convo_id):
-    with open(DB_CONV_PATH / f"{convo_id}.json") as f:
-        convo = json.load(f)
-    with open(DB_PATH / "current.json", "w") as f:
-        json.dump({"current_conversation_id": convo_id}, f)
-    st.session_state.update(convo)
-
-def get_current_conversation_id():
+def get_current_convo_id():
     current_file = DB_PATH / "current.json"
     if not current_file.exists():
-        with open(current_file, "w") as f: json.dump({"current_conversation_id": 1}, f)
+        with open(current_file, "w") as f:
+            json.dump({"current_conversation_id": 1}, f)
         return 1
-    with open(current_file) as f: return json.load(f)["current_conversation_id"]
+    with open(current_file) as f:
+        return json.load(f)["current_conversation_id"]
 
 def load_or_create_conversation():
-    convo_id = get_current_conversation_id()
-    convo_path = DB_CONV_PATH / f"{convo_id}.json"
-    if not convo_path.exists():
+    convo_id = get_current_convo_id()
+    convo_file = DB_CONV_PATH / f"{convo_id}.json"
+    if not convo_file.exists():
         convo = {
             "id": convo_id,
             "name": f"Rozmowa {convo_id}",
@@ -89,9 +87,16 @@ def load_or_create_conversation():
             "messages": [],
             "model": "gpt-4o"
         }
-        with open(convo_path, "w") as f: json.dump(convo, f)
-    with open(convo_path) as f: convo = json.load(f)
+        with open(convo_file, "w") as f:
+            json.dump(convo, f)
+    with open(convo_file) as f:
+        convo = json.load(f)
     st.session_state.update(convo)
+
+def switch_conversation(convo_id):
+    with open(DB_PATH / "current.json", "w") as f:
+        json.dump({"current_conversation_id": convo_id}, f)
+    st.rerun()
 
 def save_conversation():
     convo = {
@@ -101,15 +106,16 @@ def save_conversation():
         "messages": st.session_state["messages"],
         "model": st.session_state["model"]
     }
-    with open(DB_CONV_PATH / f"{convo['id']}.json", "w") as f: json.dump(convo, f)
+    with open(DB_CONV_PATH / f"{convo['id']}.json", "w") as f:
+        json.dump(convo, f)
 
 def get_reply(prompt, memory, model, personality):
-    msgs = [{"role": "system", "content": personality}] + memory + [{"role": "user", "content": prompt}]
-    resp = openai.ChatCompletion.create(model=model, messages=msgs)
-    usage = resp.usage or {}
+    messages = [{"role": "system", "content": personality}] + memory + [{"role": "user", "content": prompt}]
+    response = openai.ChatCompletion.create(model=model, messages=messages)
+    usage = response.usage or {}
     return {
         "role": "assistant",
-        "content": resp.choices[0].message.content,
+        "content": response.choices[0].message.content,
         "usage": {
             "prompt_tokens": usage.prompt_tokens,
             "completion_tokens": usage.completion_tokens,
@@ -117,47 +123,68 @@ def get_reply(prompt, memory, model, personality):
         }
     }
 
-# 🚀 Start aplikacji
+# 🚀 Start
 st.set_page_config(page_title="MójGPT", layout="centered")
 
-# 🌍 Wybór języka
-lang = st.sidebar.selectbox("🌍 Wybierz język", ["Polski", "Українська"])
+# 🌍 Język interfejsu
+lang = st.sidebar.selectbox("🌍 Język / Language", ["Polski", "Українська"])
 t = translations[lang]
 
-if "id" not in st.session_state: load_or_create_conversation()
+if "id" not in st.session_state:
+    load_or_create_conversation()
+
+# 🧠 Osobowość językowa
 if st.session_state.get("chatbot_personality") not in [translations["Polski"]["default_personality"], translations["Українська"]["default_personality"]]:
     st.session_state["chatbot_personality"] = t["default_personality"]
 
+# 💬 Nagłówek czatu
 st.title(t["title"])
 st.subheader(f"{t['chat_title']}: {st.session_state['name']}")
 
+# 📚 Historia
 for msg in st.session_state["messages"]:
-    with st.chat_message(msg["role"]): st.markdown(msg["content"])
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
+# 📥 Nowe pytanie
 prompt = st.chat_input(t["input_placeholder"])
 if prompt:
     st.session_state["messages"].append({"role": "user", "content": prompt})
     if len(st.session_state["messages"]) == 1:
         topic = detect_topic(prompt)
-        st.session_state["name"] = topic[:50]
-
-    mode = st.session_state.get("memory_mode", "Ostatnie 10 wiadomości")
-    memory = st.session_state["messages"][-10:] if mode == "Ostatnie 10 wiadomości" else \
-             st.session_state["messages"][-30:] if mode == "Rozszerzona (30)" else \
+        st.session_state["name"] = topic[:48]
+    memory_mode = st.session_state.get("memory_mode", "Ostatnie 10 wiadomości")
+    memory = st.session_state["messages"][-10:] if memory_mode == "Ostatnie 10 wiadomości" else \
+             st.session_state["messages"][-30:] if memory_mode == "Rozszerzona (30)" else \
              st.session_state["messages"]
-
     reply = get_reply(prompt, memory, st.session_state["model"], st.session_state["chatbot_personality"])
     st.session_state["messages"].append(reply)
-    with st.chat_message("assistant"): st.markdown(reply["content"])
+    with st.chat_message("assistant"):
+        st.markdown(reply["content"])
     save_conversation()
     save_to_qdrant(prompt, reply["content"], f"Conv{st.session_state['id']}", qdrant_client)
 
 # ⚙️ Sidebar – ustawienia
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ " + t["model_select"])
-st.session_state["model"] = st.sidebar.selectbox(t["model_select"], list(model_pricings.keys()), index=list(model_pricings.keys()).index(st.session_state["model"]), on_change=save_conversation)
+
+st.session_state["model"] = st.sidebar.selectbox(
+    t["model_select"], list(model_pricings.keys()),
+    index=list(model_pricings.keys()).index(st.session_state["model"]),
+    on_change=save_conversation
+)
 
 info = model_pricings[st.session_state["model"]]
 st.sidebar.markdown(f"📌 *{info['Opis']}*")
 st.sidebar.markdown(f"- Input: ${info['Input']} / 1M\n- Output: ${info['Output']} / 1M")
 
+# 🧠 Tryb pamięci
+st.session_state["memory_mode"] = st.sidebar.selectbox(
+    t["memory_mode"],
+    ["Ostatnie 10 wiadomości", "Rozszerzona (30)", "Pełna historia"]
+)
+
+# 🎭 Styl GPT
+st.session_state["chatbot_personality"] = st.sidebar.text_area(
+    t["personality"],
+    value=st
