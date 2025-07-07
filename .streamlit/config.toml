@@ -1,0 +1,3 @@
+[server]
+# katalog, z którego Streamlit będzie serwował statyczne pliki PWA
+staticDir = "static"
