@@ -159,4 +159,5 @@ st.session_state["model"] = st.sidebar.selectbox(t["model_select"], list(model_p
 
 info = model_pricings[st.session_state["model"]]
 st.sidebar.markdown(f"📌 *{info['Opis']}*")
-st.sidebar.markdown(f"- Input: ${info['Input']} / 1M\n- Output: ${info['Output']} / 
+st.sidebar.markdown(f"- Input: ${info['Input']} / 1M\n- Output: ${info['Output']} / 1M")
+
